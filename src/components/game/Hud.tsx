@@ -59,7 +59,7 @@ export function Hud({
           onClick={onCodex}
           className="flex items-center gap-2 rounded-sm border border-ink/25 bg-parchment/85 px-3 py-2 text-sm text-ink backdrop-blur-sm transition hover:bg-parchment"
         >
-          <BookOpen className="size-4" /> Codex {codex.length}/{CODEX.length}
+          <BookOpen className="size-4" /> Discoveries {codex.length}/{CODEX.length}
           <kbd className="rounded border border-ink/30 px-1 text-[10px]">J</kbd>
         </button>
         <button
@@ -72,7 +72,7 @@ export function Hud({
       </div>
 
       <div className="absolute bottom-4 left-4 rounded-sm border border-ink/20 bg-parchment/75 px-3 py-2 text-xs text-ink/70 backdrop-blur-sm">
-        WASD move · Shift sprint · drag to turn · E interact · J codex
+        WASD move · Shift sprint · drag to look (left/right and up/down) · E interact · J Discoveries
       </div>
 
       {nearLabel && (

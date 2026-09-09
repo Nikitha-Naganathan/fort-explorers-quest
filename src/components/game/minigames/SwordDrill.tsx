@@ -67,6 +67,11 @@ export function SwordDrill({ onClose, onComplete }: Props) {
     [],
   );
 
+  const startRound = useCallback(() => {
+    setRunning(true);
+    nextCall(0, round);
+  }, [nextCall, round]);
+
   const answer = useCallback(
     (guard: Guard) => {
       if (!running || !call) return;
@@ -91,11 +96,23 @@ export function SwordDrill({ onClose, onComplete }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const g = GUARDS.find((x) => x.key === e.key);
-      if (g) answer(g.id);
+      if (g) {
+        e.preventDefault();
+        answer(g.id);
+        return;
+      }
+      if ((e.key === "Enter" || e.key === " ") && !running && !done) {
+        e.preventDefault();
+        startRound();
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [answer]);
+  }, [answer, running, done, startRound, onClose]);
 
   useEffect(() => () => clearTimer(), []);
 
@@ -110,8 +127,8 @@ export function SwordDrill({ onClose, onComplete }: Props) {
               <Swords className="size-5" /> Sword drill
             </h2>
             <p className="mt-1 text-sm text-ink/60">
-              The havildar calls a guard. Answer with 1 / 2 / 3 or the buttons — recovery matters
-              more than the blow.
+              The havildar calls a guard. Answer before the window closes — recovery matters more
+              than the blow.
             </p>
           </div>
           <button
@@ -121,6 +138,24 @@ export function SwordDrill({ onClose, onComplete }: Props) {
           >
             <X className="size-4" />
           </button>
+        </div>
+
+        {/* Always-visible key legend so the controls never have to be guessed. */}
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-sm border border-ink/20 bg-white/40 px-3 py-2 text-sm text-ink/75">
+          {GUARDS.map((g) => (
+            <span key={g.id} className="flex items-center gap-1.5">
+              <kbd className="rounded border border-ink/35 bg-white/70 px-1.5 py-0.5 font-mono text-xs">
+                {g.key}
+              </kbd>
+              {g.label}
+            </span>
+          ))}
+          <span className="ml-auto flex items-center gap-1.5 text-ink/55">
+            <kbd className="rounded border border-ink/35 bg-white/70 px-1.5 py-0.5 font-mono text-xs">
+              Enter
+            </kbd>
+            start round
+          </span>
         </div>
 
         {!done ? (
@@ -143,16 +178,16 @@ export function SwordDrill({ onClose, onComplete }: Props) {
                   <p className="mt-1 text-sm text-ink/60">
                     {GUARDS.find((g) => g.id === call)!.note}
                   </p>
+                  <p className="mt-2 text-xs text-ink/45">
+                    Press {GUARDS.find((g) => g.id === call)!.key}
+                  </p>
                 </div>
               ) : (
                 <button
-                  onClick={() => {
-                    setRunning(true);
-                    nextCall(0, round);
-                  }}
+                  onClick={startRound}
                   className="rounded-sm bg-ink px-6 py-2.5 font-display text-parchment hover:brightness-125"
                 >
-                  {round === 0 && hits + misses === 0 ? "Take guard" : `Begin round ${round + 1}`}
+                  {round === 0 && hits + misses === 0 ? "Take guard (Enter)" : `Begin round ${round + 1} (Enter)`}
                 </button>
               )}
             </div>
@@ -195,7 +230,7 @@ export function SwordDrill({ onClose, onComplete }: Props) {
               onClick={() => onComplete(accuracy)}
               className="mt-6 w-full rounded-sm bg-ink px-4 py-3 font-display text-parchment hover:brightness-125"
             >
-              Return to the fort (+1 Valour, codex entry)
+              Return to the fort (+1 Valour, discovery unlocked)
             </button>
           </div>
         )}

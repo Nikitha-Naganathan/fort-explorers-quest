@@ -83,8 +83,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
         if (fresh.length === 0) return s;
         setToast(
           fresh.length === 1
-            ? "New codex entry recorded"
-            : `${fresh.length} new codex entries recorded`,
+            ? "New discovery recorded"
+            : `${fresh.length} new discoveries recorded`,
         );
         return { ...s, codex: [...s.codex, ...fresh] };
       });

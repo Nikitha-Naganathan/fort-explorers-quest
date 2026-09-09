@@ -43,11 +43,10 @@ export function CharacterCreation() {
                 <button
                   key={a.id}
                   onClick={() => setPicked(a.id)}
-                  className={`rounded-sm p-4 text-left transition ${
-                    active
+                  className={`rounded-sm p-4 text-left transition ${active
                       ? "panel-parchment ring-2 ring-gold"
                       : "panel-stone text-parchment/85 hover:brightness-125"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <span
@@ -70,7 +69,7 @@ export function CharacterCreation() {
                   <p
                     className={`mt-2 text-xs italic ${active ? "text-ink/70" : "text-parchment/55"}`}
                   >
-                    Perk — {a.perk}
+                    {a.perk}
                   </p>
                 </button>
               );
@@ -121,3 +120,6 @@ export function CharacterCreation() {
     </div>
   );
 }
+
+
+

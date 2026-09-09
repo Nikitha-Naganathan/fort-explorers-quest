@@ -8,6 +8,45 @@ export const WALL_HALF = 38;
 export const WALL_HEIGHT = 9;
 export const PLAY_BOUND = 34.5;
 
+const GATE_GAP = 5;
+
+// Simple 2D collision shapes for the player controller (see Player.tsx).
+// These aren't a physics engine — just enough to stop the player from
+// walking through bastions, gate towers and the curtain walls.
+export type Collider =
+  | { type: "circle"; x: number; z: number; radius: number }
+  | { type: "box"; x: number; z: number; halfW: number; halfD: number };
+
+export const COLLIDERS: Collider[] = [
+  // corner bastions + the mid-north bastion
+  { type: "circle", x: -WALL_HALF, z: -WALL_HALF, radius: 7.2 },
+  { type: "circle", x: WALL_HALF, z: -WALL_HALF, radius: 7.2 },
+  { type: "circle", x: -WALL_HALF, z: WALL_HALF, radius: 7.2 },
+  { type: "circle", x: WALL_HALF, z: WALL_HALF, radius: 7.2 },
+  { type: "circle", x: 0, z: -WALL_HALF, radius: 7.2 },
+  // gatehouse towers
+  { type: "box", x: -6.5, z: WALL_HALF, halfW: 3.2, halfD: 3.2 },
+  { type: "box", x: 6.5, z: WALL_HALF, halfW: 3.2, halfD: 3.2 },
+  // curtain walls (a safety net behind PLAY_BOUND)
+  { type: "box", x: 0, z: -WALL_HALF, halfW: WALL_HALF, halfD: 1.9 },
+  { type: "box", x: WALL_HALF, z: 0, halfW: 1.9, halfD: WALL_HALF },
+  { type: "box", x: -WALL_HALF, z: 0, halfW: 1.9, halfD: WALL_HALF },
+  {
+    type: "box",
+    x: WALL_HALF / 2 + GATE_GAP / 2,
+    z: WALL_HALF,
+    halfW: (WALL_HALF - GATE_GAP) / 2,
+    halfD: 1.9,
+  },
+  {
+    type: "box",
+    x: -(WALL_HALF / 2 + GATE_GAP / 2),
+    z: WALL_HALF,
+    halfW: (WALL_HALF - GATE_GAP) / 2,
+    halfD: 1.9,
+  },
+];
+
 const MERLON_GEOMETRY = new THREE.BoxGeometry(1.6, 1.4, 1.6);
 
 function Merlons({
@@ -191,7 +230,7 @@ export function Fort() {
     [granite],
   );
 
-  const gateGap = 5;
+  const gateGap = GATE_GAP;
 
   return (
     <group>

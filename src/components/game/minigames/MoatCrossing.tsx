@@ -6,28 +6,39 @@ interface Props {
   onComplete: () => void;
 }
 
-const CROCS = [
-  { speed: 0.28, offset: 0, lane: 0 },
-  { speed: -0.21, offset: 0.4, lane: 1 },
-  { speed: 0.34, offset: 0.75, lane: 2 },
-];
-
-const OBSERVE_TARGET = 3;
+// A single, clearly-readable timing game: a crocodile icon sweeps back and
+// forth across the channel. A red "strike zone" sits in the middle. Press
+// SPACE (or click) while the icon is OUTSIDE the strike zone to log a safe
+// pass. Three clean passes in practice unlock the real crossing, which uses
+// the same rule at a faster, tighter pace.
+const PRACTICE_TARGET = 3;
+const PRACTICE_SPEED = 1.1; // radians/sec
+const PRACTICE_ZONE = 0.22; // strike zone half-width, 0..0.5
+const CROSS_SPEED = 1.8;
+const CROSS_ZONE = 0.14;
 
 export function MoatCrossing({ onClose, onComplete }: Props) {
-  const [phase, setPhase] = useState<"observe" | "cross" | "caught" | "safe">("observe");
-  const [t, setT] = useState(0);
-  const [logged, setLogged] = useState<number[]>([]);
-  const [swimmer, setSwimmer] = useState(0);
+  const [phase, setPhase] = useState<"practice" | "cross" | "caught" | "safe">("practice");
+  const [practiceHits, setPracticeHits] = useState(0);
+  const [flash, setFlash] = useState<"good" | "bad" | null>(null);
+  const posRef = useRef(0.5); // 0..1 across the channel
+  const [, forceRender] = useState(0);
   const raf = useRef<number | null>(null);
-  const last = useRef<number>(0);
+  const last = useRef(0);
+  const tRef = useRef(0);
+
+  const speed = phase === "cross" ? CROSS_SPEED : PRACTICE_SPEED;
+  const zone = phase === "cross" ? CROSS_ZONE : PRACTICE_ZONE;
 
   useEffect(() => {
     const loop = (now: number) => {
       const dt = last.current ? Math.min((now - last.current) / 1000, 0.05) : 0;
       last.current = now;
-      setT((v) => v + dt);
-      setSwimmer((s) => (phase === "cross" ? Math.min(s + dt * 0.34, 1) : s));
+      if (phase === "practice" || phase === "cross") {
+        tRef.current += dt;
+        posRef.current = 0.5 + 0.5 * Math.sin(tRef.current * speed);
+      }
+      forceRender((n) => (n + 1) % 1000000);
       raf.current = requestAnimationFrame(loop);
     };
     raf.current = requestAnimationFrame(loop);
@@ -35,51 +46,85 @@ export function MoatCrossing({ onClose, onComplete }: Props) {
       if (raf.current) cancelAnimationFrame(raf.current);
       last.current = 0;
     };
-  }, [phase]);
+  }, [phase, speed]);
 
-  const positions = CROCS.map((c) => {
-    const raw = (c.offset + c.speed * t) % 1;
-    return raw < 0 ? raw + 1 : raw;
-  });
+  const attempt = () => {
+    if (phase !== "practice" && phase !== "cross") return;
+    const distFromCenter = Math.abs(posRef.current - 0.5);
+    const inStrikeZone = distFromCenter < zone;
 
-  // during the crossing, the swimmer is caught if a crocodile is close in the lane being crossed
-  useEffect(() => {
-    if (phase !== "cross") return;
-    const lane = Math.min(2, Math.floor(swimmer * 3));
-    const crocX = positions[lane]!;
-    if (Math.abs(crocX - 0.5) < 0.1) {
+    if (phase === "practice") {
+      if (inStrikeZone) {
+        setFlash("bad");
+        return;
+      }
+      setFlash("good");
+      setPracticeHits((h) => {
+        const next = h + 1;
+        if (next >= PRACTICE_TARGET) {
+          window.setTimeout(() => setPhase("cross"), 500);
+        }
+        return next;
+      });
+      return;
+    }
+
+    // phase === "cross"
+    if (inStrikeZone) {
+      setFlash("bad");
       setPhase("caught");
-      setSwimmer(0);
-    } else if (swimmer >= 1) {
+    } else {
+      setFlash("good");
       setPhase("safe");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [swimmer, phase]);
-
-  const logPass = (lane: number) => {
-    if (phase !== "observe") return;
-    const crocX = positions[lane]!;
-    const correct = Math.abs(crocX - 0.5) < 0.14;
-    if (correct && !logged.includes(lane)) setLogged([...logged, lane]);
   };
 
-  const charted = logged.length >= OBSERVE_TARGET;
+  useEffect(() => {
+    if (!flash) return;
+    const t = window.setTimeout(() => setFlash(null), 240);
+    return () => window.clearTimeout(t);
+  }, [flash]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        if (phase === "caught") {
+          setPhase("practice");
+          setPracticeHits(0);
+          tRef.current = 0;
+        } else {
+          attempt();
+        }
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, zone]);
+
+  const pos = posRef.current;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 py-8">
-      <div className="panel-parchment w-full max-w-3xl rounded-sm p-7">
+      <div className="panel-parchment w-full max-w-2xl rounded-sm p-7">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="flex items-center gap-2 text-2xl">
               <Waves className="size-5" /> Reading the moat
             </h2>
             <p className="mt-1 text-sm text-ink/60">
-              {phase === "observe"
-                ? "Each watcher keeps its own round. Mark a lane the instant its crocodile passes the mid-channel post."
+              {phase === "practice"
+                ? `Watch the crocodile's round. Press SPACE while it's clear of the red strike
+                   zone — ${practiceHits}/${PRACTICE_TARGET} clean passes logged.`
                 : phase === "cross"
-                  ? "Swimming. The channel is crossed one lane at a time."
+                  ? "Same rule, real stakes: press SPACE the moment it's clear, and cross."
                   : phase === "caught"
-                    ? "The water was not yours."
+                    ? "Caught mid-channel. Press SPACE to go back and re-time the round."
                     : "Across, dry and unbitten."}
             </p>
           </div>
@@ -92,74 +137,58 @@ export function MoatCrossing({ onClose, onComplete }: Props) {
           </button>
         </div>
 
-        <div className="mt-5 space-y-2 rounded-sm border border-ink/25 bg-[#4c7a5c]/25 p-3">
-          {CROCS.map((c, lane) => {
-            const x = positions[lane]!;
-            const swimming = phase === "cross" && Math.floor(swimmer * 3) === lane;
-            return (
-              <button
-                key={lane}
-                onClick={() => logPass(lane)}
-                className={`relative block h-16 w-full overflow-hidden rounded-sm border transition ${
-                  logged.includes(lane) ? "border-emerald-800/60" : "border-ink/20"
-                } bg-[linear-gradient(180deg,#5b8a68,#3f6b53)]`}
+        {(phase === "practice" || phase === "cross") && (
+          <div className="mt-5">
+            <div
+              className={`relative h-20 overflow-hidden rounded-sm border transition-colors ${
+                flash === "good"
+                  ? "border-emerald-700/60 bg-emerald-700/10"
+                  : flash === "bad"
+                    ? "border-red-800/60 bg-red-800/10"
+                    : "border-ink/20"
+              } bg-[linear-gradient(180deg,#5b8a68,#3f6b53)]`}
+            >
+              {/* strike zone */}
+              <div
+                className="absolute inset-y-0 bg-red-900/35"
+                style={{ left: `${(0.5 - zone) * 100}%`, width: `${zone * 2 * 100}%` }}
+              />
+              <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/40" />
+              {/* crocodile */}
+              <span
+                className="absolute top-1/2 -translate-y-1/2 text-3xl"
+                style={{
+                  left: `${pos * 100}%`,
+                  transform: `translate(-50%,-50%) scaleX(${Math.cos(tRef.current * speed) >= 0 ? 1 : -1})`,
+                }}
+                aria-hidden
               >
-                <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/50" />
-                <span
-                  className="absolute top-1/2 -translate-y-1/2 text-2xl transition-none"
-                  style={{
-                    left: `${x * 100}%`,
-                    transform: `translate(-50%,-50%) scaleX(${c.speed > 0 ? 1 : -1})`,
-                  }}
-                  aria-hidden
-                >
-                  🐊
-                </span>
-                {swimming && (
-                  <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl">
-                    🧍
-                  </span>
-                )}
-                <span className="absolute bottom-1 left-2 text-[11px] text-white/70">
-                  Lane {lane + 1} · {logged.includes(lane) ? "round charted" : "watch and mark"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {phase === "observe" && (
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <p className="text-sm text-ink/65">
-              Charted {logged.length} of {OBSERVE_TARGET} rounds
+                🐊
+              </span>
+            </div>
+            <p className="mt-2 text-center text-xs text-ink/50">
+              Red band = strike zone (unsafe) · everywhere else = clear
             </p>
             <button
-              disabled={!charted}
-              onClick={() => {
-                setSwimmer(0);
-                setPhase("cross");
-              }}
-              className="rounded-sm bg-ink px-5 py-2.5 font-display text-parchment enabled:hover:brightness-125 disabled:opacity-40"
+              onClick={attempt}
+              className="mt-4 w-full rounded-sm bg-ink px-4 py-3 font-display text-parchment hover:brightness-125"
             >
-              Try the crossing
+              {phase === "practice" ? "Mark it clear (Space)" : "Cross now (Space)"}
             </button>
           </div>
         )}
 
-        {(phase === "cross" || phase === "caught") && (
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <div className="h-2 grow rounded-full bg-ink/15">
-              <div className="h-2 rounded-full bg-ink/60" style={{ width: `${swimmer * 100}%` }} />
-            </div>
-            {phase === "caught" && (
-              <button
-                onClick={() => setPhase("observe")}
-                className="rounded-sm bg-ink px-5 py-2.5 font-display text-parchment hover:brightness-125"
-              >
-                Back to the bank
-              </button>
-            )}
-          </div>
+        {phase === "caught" && (
+          <button
+            onClick={() => {
+              setPhase("practice");
+              setPracticeHits(0);
+              tRef.current = 0;
+            }}
+            className="mt-5 w-full rounded-sm bg-ink px-4 py-3 font-display text-parchment hover:brightness-125"
+          >
+            Back to the bank (Space)
+          </button>
         )}
 
         {phase === "safe" && (

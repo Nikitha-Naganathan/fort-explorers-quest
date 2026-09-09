@@ -17,7 +17,7 @@ export function CodexPanel({ known, onClose }: { known: string[]; onClose: () =>
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="flex items-center gap-2 text-2xl">
-              <BookOpen className="size-5" /> Historical Codex
+              <BookOpen className="size-5" /> Discoveries
             </h2>
             <p className="mt-1 text-sm text-ink/60">
               {known.length} of {CODEX.length} entries recorded — {pct}% of the fort understood
@@ -25,7 +25,7 @@ export function CodexPanel({ known, onClose }: { known: string[]; onClose: () =>
           </div>
           <button
             onClick={onClose}
-            aria-label="Close codex"
+            aria-label="Close discoveries"
             className="rounded-sm border border-ink/25 p-2 text-ink/70 transition hover:bg-ink/10"
           >
             <X className="size-4" />
@@ -44,9 +44,8 @@ export function CodexPanel({ known, onClose }: { known: string[]; onClose: () =>
               <button
                 key={c}
                 onClick={() => setTab(c)}
-                className={`rounded-sm px-3 py-1.5 text-sm transition ${
-                  tab === c ? "bg-ink text-parchment" : "border border-ink/25 text-ink/70 hover:bg-ink/10"
-                }`}
+                className={`rounded-sm px-3 py-1.5 text-sm transition ${tab === c ? "bg-ink text-parchment" : "border border-ink/25 text-ink/70 hover:bg-ink/10"
+                  }`}
               >
                 {c} <span className="tabular-nums opacity-70">{got}/{total}</span>
               </button>

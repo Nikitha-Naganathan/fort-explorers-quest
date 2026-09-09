@@ -1,13 +1,14 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef, type MutableRefObject } from "react";
 import * as THREE from "three";
-import { PLAY_BOUND } from "./Fort";
+import { COLLIDERS, PLAY_BOUND } from "./Fort";
 import type { InteractionPoint } from "@/game/interactions";
 import type { KeyMap } from "@/game/useKeyboard";
 
 interface PlayerProps {
   keys: MutableRefObject<KeyMap>;
   yaw: MutableRefObject<number>;
+  pitch: MutableRefObject<number>;
   points: InteractionPoint[];
   onNear: (id: string | null) => void;
   cloth: string;
@@ -17,8 +18,46 @@ interface PlayerProps {
 
 const WALK = 6.2;
 const SPRINT = 11;
+const PLAYER_RADIUS = 0.55;
 
-export function Player({ keys, yaw, points, onNear, cloth, sash, frozen }: PlayerProps) {
+/** Pushes `pos` out of any collider it's overlapping. Cheap and approximate
+ * on purpose — this only needs to stop the player from walking through
+ * bastions, gate towers and the curtain walls, not simulate physics. */
+function resolveCollisions(pos: THREE.Vector3) {
+  for (const c of COLLIDERS) {
+    if (c.type === "circle") {
+      const dx = pos.x - c.x;
+      const dz = pos.z - c.z;
+      const dist = Math.hypot(dx, dz);
+      const minDist = c.radius + PLAYER_RADIUS;
+      if (dist < minDist) {
+        if (dist < 1e-4) {
+          pos.x += minDist;
+        } else {
+          const push = minDist - dist;
+          pos.x += (dx / dist) * push;
+          pos.z += (dz / dist) * push;
+        }
+      }
+    } else {
+      const halfW = c.halfW + PLAYER_RADIUS;
+      const halfD = c.halfD + PLAYER_RADIUS;
+      const dx = pos.x - c.x;
+      const dz = pos.z - c.z;
+      if (Math.abs(dx) < halfW && Math.abs(dz) < halfD) {
+        const penX = halfW - Math.abs(dx);
+        const penZ = halfD - Math.abs(dz);
+        if (penX < penZ) {
+          pos.x += Math.sign(dx || 1) * penX;
+        } else {
+          pos.z += Math.sign(dz || 1) * penZ;
+        }
+      }
+    }
+  }
+}
+
+export function Player({ keys, yaw, pitch, points, onNear, cloth, sash, frozen }: PlayerProps) {
   const body = useRef<THREE.Group>(null);
   const pos = useRef(new THREE.Vector3(0, 0, 24));
   const vel = useRef(new THREE.Vector3());
@@ -52,6 +91,9 @@ export function Player({ keys, yaw, points, onNear, cloth, sash, frozen }: Playe
     const blend = 1 - Math.exp(-12 * dt);
     vel.current.lerp(wish, blend);
     pos.current.addScaledVector(vel.current, dt);
+
+    resolveCollisions(pos.current);
+
     pos.current.x = THREE.MathUtils.clamp(pos.current.x, -PLAY_BOUND, PLAY_BOUND);
     pos.current.z = THREE.MathUtils.clamp(pos.current.z, -PLAY_BOUND, PLAY_BOUND);
 
@@ -69,13 +111,15 @@ export function Player({ keys, yaw, points, onNear, cloth, sash, frozen }: Playe
       body.current.rotation.y = cur + diff * (1 - Math.exp(-14 * dt));
     }
 
-    // chase camera
+    // chase camera — yaw orbits left/right, pitch tilts the camera up/down
     const dist = 11;
-    const height = 6.4;
+    const p = THREE.MathUtils.clamp(pitch.current, -0.15, 1.1);
+    const horiz = dist * Math.cos(p);
+    const height = 3 + dist * Math.sin(p) * 1.6 + 3.4;
     camTarget.current.set(
-      pos.current.x + Math.sin(yaw.current) * dist,
-      height,
-      pos.current.z + Math.cos(yaw.current) * dist,
+      pos.current.x + Math.sin(yaw.current) * horiz,
+      Math.max(2.2, height),
+      pos.current.z + Math.cos(yaw.current) * horiz,
     );
     state.camera.position.lerp(camTarget.current, 1 - Math.exp(-6 * dt));
     state.camera.lookAt(pos.current.x, 1.8, pos.current.z);

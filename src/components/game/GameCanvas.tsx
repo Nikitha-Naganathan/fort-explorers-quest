@@ -20,6 +20,8 @@ interface Props {
   frozen: boolean;
 }
 
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
 export function GameCanvas({
   keys,
   level,
@@ -31,8 +33,10 @@ export function GameCanvas({
   frozen,
 }: Props) {
   const yaw = useRef(0);
+  const pitch = useRef(0);
   const dragging = useRef(false);
   const lastX = useRef(0);
+  const lastY = useRef(0);
 
   const activeLevel = level === 1 ? 1 : 2;
   const points = INTERACTIONS.filter((p) => p.level === activeLevel);
@@ -44,6 +48,7 @@ export function GameCanvas({
       onPointerDown={(e) => {
         dragging.current = true;
         lastX.current = e.clientX;
+        lastY.current = e.clientY;
       }}
       onPointerUp={() => {
         dragging.current = false;
@@ -54,7 +59,9 @@ export function GameCanvas({
       onPointerMove={(e) => {
         if (!dragging.current) return;
         yaw.current += (e.clientX - lastX.current) * 0.005;
+        pitch.current = clamp(pitch.current - (e.clientY - lastY.current) * 0.004, -0.15, 1.1);
         lastX.current = e.clientX;
+        lastY.current = e.clientY;
       }}
     >
       <Canvas
@@ -145,6 +152,7 @@ export function GameCanvas({
           <Player
             keys={keys}
             yaw={yaw}
+            pitch={pitch}
             points={points}
             onNear={onNear}
             cloth={cloth}

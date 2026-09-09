@@ -53,7 +53,7 @@ export function TitleScreen() {
             onClick={() => setOverlay({ kind: "codex" })}
             className="flex w-64 items-center justify-center gap-2 rounded-sm border border-border/70 px-6 py-3 text-sm text-parchment/80 transition hover:bg-secondary/60"
           >
-            <BookOpen className="size-4" /> Codex — {known}/{CODEX.length} entries
+            <BookOpen className="size-4" /> Discoveries — {known}/{CODEX.length}
           </button>
           {hasSave && (
             <button
@@ -66,7 +66,7 @@ export function TitleScreen() {
         </div>
 
         <p className="mt-10 text-xs text-parchment/45">
-          Drag to look · W A S D to walk · Shift to run · E to interact · J for the codex
+          Drag to look · W A S D to walk · Shift to run · E to interact · J for Discoveries
         </p>
       </div>
     </div>
